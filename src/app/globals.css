@@ -5,3 +5,7 @@
 html, body {
   height: 100%;
 }
+
+ccc-connector {
+  z-index: 999;
+}

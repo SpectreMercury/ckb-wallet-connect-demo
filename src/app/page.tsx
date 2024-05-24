@@ -13,7 +13,7 @@ import {
 } from '@wagmi/core';
 import { InjectedConnector } from '@wagmi/core/connectors';
 import { publicProvider } from '@wagmi/core/providers/public';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from "framer-motion";
 import { cn } from "@/utils/cn";
 import Image from 'next/image';
@@ -43,6 +43,9 @@ export default function Home() {
   const [joyIdWallet, setJoyIDWallet] = useState<string>();
   const [joyIdPubKey, setJoyIdPubKey] = useState<string>();
   const [cccAddress, setCccAddress] = useState<string>();
+  const [internalAddress, setInternalAddress] = useState("");
+  const [address, setAddress] = useState("");
+  const signer = ccc.useSigner();
 
   type Account = {
     lockScript: Script;
@@ -464,13 +467,39 @@ function isAcpLockMatches(lock: Script, blake160: Hash, config: SporeConfig): bo
     console.log(txHash);
   }
 
-  const connectCCC = async () => {
-    // const cccAccount = ccc.Connector();
+  const createCCCSpore = async () => {
+    const { txSkeleton } = await createSpore({
+      data: {
+        contentType:'text/plain',
+        content: bytifyRawString('Hey Hey Hey, JoyID Ma Dong Mei'),
+      },
+      fromInfos: [address!!],
+      toLock: (await signer?.getRecommendedAddressObj(address))!!.script,
+      config: predefinedSporeConfigs.Testnet,
+      capacityMargin: BI.from(0)
+    });
+    console.log(JSON.stringify(txSkeleton));
+    const tx = ccc.Transaction.fromLumosSkeleton(txSkeleton);
+    // const signedTx = await signer?.signTransaction(tx);
+    const txHash = await signer?.sendTransaction(tx!!)
+    console.log(txHash);
   }
+
+  useEffect(() => {
+    if (!signer) {
+      setInternalAddress("");
+      setAddress("");
+      return;
+    }
+
+    (async () => {
+      setInternalAddress(await signer.getInternalAddress());
+      setAddress(await signer.getRecommendedAddress());
+    })();
+  }, [signer]);
 
 
   return (
-    <ccc.Provider>
       <main className="w-full h-full p-10 grid grid-cols-1 md:grid-cols-3 mx-auto gap-4 relative">
         <div className="absolute pointer-events-none inset-0 flex items-center justify-center dark:bg-black bg-black [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]"></div>
         {/* <div>Metamask ETH Address: {metamaskETHAddress && metamaskETHAddress}</div>
@@ -783,14 +812,14 @@ function isAcpLockMatches(lock: Script, blake160: Hash, config: SporeConfig): bo
                 <div className="font-extrabold">CCC</div>
                 </div>
                 {
-                  secp256k1Address && 
+                  address && 
                   <>
                     <div>
-                      <p className='font-light'>Secp256k1 Address: {formatString(secp256k1Address)}</p>
+                      <p className='font-light'>CCC Address: {formatString(address)}</p>
                     </div>
                     <div className='flex gap-1'>
                       <button
-                        onClick={createSporeToACPCluster} 
+                        onClick={createCCCSpore} 
                         className="bg-slate-800 no-underline group cursor-pointer relative shadow-2xl shadow-zinc-900 rounded-full p-px text-xs font-semibold leading-6  text-white inline-block">
                         <span className="absolute inset-0 overflow-hidden rounded-full">
                           <span className="absolute inset-0 rounded-full bg-[image:radial-gradient(75%_100%_at_50%_0%,rgba(56,189,248,0.6)_0%,rgba(56,189,248,0)_75%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100"></span>
@@ -845,7 +874,7 @@ function isAcpLockMatches(lock: Script, blake160: Hash, config: SporeConfig): bo
                   </>
                 }
                 {
-                  !secp256k1Address && <div onClick={open}>
+                  !address && <div onClick={open}>
                   <button className="bg-slate-800 no-underline group cursor-pointer relative shadow-2xl shadow-zinc-900 rounded-full p-px text-xs font-semibold leading-6  text-white inline-block">
                     <span className="absolute inset-0 overflow-hidden rounded-full">
                       <span className="absolute inset-0 rounded-full bg-[image:radial-gradient(75%_100%_at_50%_0%,rgba(56,189,248,0.6)_0%,rgba(56,189,248,0)_75%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100"></span>
@@ -876,7 +905,6 @@ function isAcpLockMatches(lock: Script, blake160: Hash, config: SporeConfig): bo
           </div>
         </div>
       </main>
-    </ccc.Provider>
   );
 }
 
